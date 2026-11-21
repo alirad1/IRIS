@@ -64,6 +64,26 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 
 This copies `iris/`, `config/`, `tests/` and the README into `~/IRIS` on the Pi. Add `-WithModel` to copy the MediaPipe model as well. Uses the existing venv `~/iris-servo-venv`; nothing gets installed.
 
+## Phase 3: aim calibration and follow mode
+
+1. Pi (Pi Connect shell). This starts the camera streamer and the motor service in normal mode. **The servos snap to home**, so put the arm near home first. Ctrl+C stops it, and the servos go limp.
+   ```bash
+   bash ~/IRIS/scripts/run_pi.sh
+   ```
+2. PC: aim calibration. Jog the arm (`1`–`4` pick a joint, `a`/`d` jog, `w`/`s` change the step size), then click the spot it aims at. Repeat for about 9 spots spread over the area, then press `S` to save to `config/aim_map.json`.
+   ```powershell
+   .venv\Scripts\python -m iris.tools.aim_calibrate
+   ```
+3. PC: follow mode. Use `--preview` first to see what it would do without moving anything.
+   ```powershell
+   .venv\Scripts\python -m iris.tools.follow --preview
+   .venv\Scripts\python -m iris.tools.follow
+   ```
+   - The status line shows FOLLOW, OUT OF REACH (aiming at the nearest calibrated spot), LOST (holding) or PAUSED.
+   - `space` pauses and resumes; `q` quits, and the arm holds where it is.
+
+Smoothing: a one-euro filter on the hand point, a 10 px deadband (`--deadband`), and the motor service's 10 deg/s speed and 40 deg/s² acceleration limits.
+
 ## Run
 
 All Pi commands run from `~/IRIS`, in an SSH session (`ssh iris-pi`).

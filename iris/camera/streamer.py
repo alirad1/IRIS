@@ -4,12 +4,13 @@ Run on the Pi from ~/IRIS:
     ~/iris-servo-venv/bin/python -m iris.camera.streamer
     ~/iris-servo-venv/bin/python -m iris.camera.streamer --snapshot /tmp/iris.jpg
 
-One client at a time. When a client disconnects, it waits for the next one.
+One client at a time; a new client takes over from the current one.
 Never touches the PCA9685.
 """
 from __future__ import annotations
 
 import argparse
+import select
 import socket
 import sys
 import time
@@ -61,29 +62,43 @@ def main(argv=None) -> int:
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind(("0.0.0.0", cc.tcp_port))
-        srv.listen(1)
-        print(f"camera {cc.width}x{cc.height} @ {cc.framerate} fps, TCP port {cc.tcp_port}",
-              flush=True)
+        srv.listen(4)
+        print(f"camera {cc.width}x{cc.height} @ {cc.framerate} fps, TCP port {cc.tcp_port}. "
+              "One viewer at a time; a new viewer takes over from the old one.", flush=True)
+        conn, peer = None, None
+        n, t0 = 0, time.monotonic()
         try:
             while True:
-                conn, addr = srv.accept()
-                conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                print(f"client {addr[0]} connected", flush=True)
-                n, t0 = 0, time.monotonic()
+                # A new viewer replaces the current one (e.g. a forgotten window).
+                ready, _, _ = select.select([srv], [], [], 0 if conn else None)
+                if ready:
+                    new, addr = srv.accept()
+                    new.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                    new.settimeout(2.0)
+                    if conn is not None:
+                        print(f"client {peer} replaced by {addr[0]}", flush=True)
+                        conn.close()
+                    else:
+                        print(f"client {addr[0]} connected", flush=True)
+                    conn, peer = new, addr[0]
+                    n, t0 = 0, time.monotonic()
+                frame = cam.capture_array("main")
                 try:
-                    while True:
-                        frame = cam.capture_array("main")
-                        protocol.send_frame(conn, encode(cv2, frame, cc.jpeg_quality))
-                        n += 1
-                        if n % 150 == 0:
-                            print(f"{n / (time.monotonic() - t0):.1f} fps", flush=True)
-                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-                    print(f"client {addr[0]} disconnected", flush=True)
-                finally:
+                    protocol.send_frame(conn, encode(cv2, frame, cc.jpeg_quality))
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+                        socket.timeout, OSError):
+                    print(f"client {peer} disconnected", flush=True)
                     conn.close()
+                    conn, peer = None, None
+                    continue
+                n += 1
+                if n % 300 == 0:
+                    print(f"{n / (time.monotonic() - t0):.1f} fps", flush=True)
         except KeyboardInterrupt:
             pass
         finally:
+            if conn is not None:
+                conn.close()
             srv.close()
     finally:
         cam.stop()

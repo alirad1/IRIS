@@ -25,7 +25,7 @@ if (-not $Force -and -not $KeepPiConfig) {
     }
 }
 
-$items = @("iris", "tests", "README.md")
+$items = @("iris", "tests", "README.md", "scripts/run_pi.sh")
 $wipe = "iris tests"
 # config/ is never wiped: only iris.json is overwritten, so the calibration
 # session file and backups next to it survive.
