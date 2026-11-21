@@ -6,7 +6,15 @@ from iris import config as config_mod
 from iris.motor.hw import FakePCA9685
 from iris.motor.service import MotorService
 
-BASE = config_mod.load_raw()
+# Tests use their own fixed config (uncalibrated: -10..10, home 0, no invert) so
+# they don't change when the real config/iris.json is calibrated.
+_real = config_mod.load_raw()
+BASE = copy.deepcopy(_real)
+for _name, _j in BASE["joints"].items():
+    _j.pop("invert", None)
+    _j.update({"min": -10, "max": 10, "home": 0})
+    for _s in _j["servos"]:
+        _s["trim"] = 0
 
 
 def raw(**joint_overrides):

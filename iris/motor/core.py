@@ -22,8 +22,11 @@ class CommandError(ValueError):
     """A target command was rejected. Nothing moves because of it."""
 
 
-def servo_signs(joint_name: str) -> Tuple[int, ...]:
-    return PAIR_SIGNS if joint_name == "pair" else (+1,)
+def servo_signs(joint: JointCfg) -> Tuple[int, ...]:
+    """Direction of each servo of a joint. The pair is always (+, -) or, with
+    invert, (-, +): mirrored either way."""
+    base = PAIR_SIGNS if joint.name == "pair" else (+1,)
+    return tuple(-s for s in base) if joint.invert else base
 
 
 def physical_envelope(joint: JointCfg) -> Tuple[float, float]:
@@ -33,7 +36,7 @@ def physical_envelope(joint: JointCfg) -> Tuple[float, float]:
     always limited as one value and both sides shrink together.
     """
     lo, hi = -math.inf, math.inf
-    for s, sign in zip(joint.servos, servo_signs(joint.name)):
+    for s, sign in zip(joint.servos, servo_signs(joint)):
         # 0 <= 135 + trim + sign * x <= 270
         a = (0.0 - SERVO_CENTER_DEG - s.trim) / sign
         b = (SERVO_RANGE_DEG - SERVO_CENTER_DEG - s.trim) / sign
@@ -74,7 +77,7 @@ class ServoBus:
         angles: Dict[int, float] = {}
         for joint, env, x in zip(self._joints, self._envelopes, values):
             x = _clamp(x, *env)  # one value per joint, pair included
-            for s, sign in zip(joint.servos, servo_signs(joint.name)):
+            for s, sign in zip(joint.servos, servo_signs(joint)):
                 angles[s.channel] = SERVO_CENTER_DEG + s.trim + sign * x
         self._check_pair(angles)
         return angles

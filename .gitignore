@@ -7,3 +7,6 @@ __pycache__/
 *.pyc
 models/*.task
 *.jpg
+config/calibration_session.json
+config/*.bak
+config/*.tmp

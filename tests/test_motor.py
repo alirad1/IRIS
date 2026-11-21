@@ -38,6 +38,18 @@ class PairRule(unittest.TestCase):
         self.assertAlmostEqual(a[1], 135 + 7.5)
         self.assertAlmostEqual(a[2], 135 - 7.5)
 
+    def test_invert_flips_direction_but_stays_mirrored(self):
+        c = cfg(pair={"invert": True})
+        bus = ServoBus(c, FakePCA9685(c.pca, c.channels))
+        a = bus.servo_angles([0, 7.5, 0, 0])
+        self.assertAlmostEqual(a[1], 135 - 7.5)
+        self.assertAlmostEqual(a[2], 135 + 7.5)
+        d1, d2 = pair_offsets(c, a)
+        self.assertAlmostEqual(d1, -d2)
+        c = cfg(j3={"invert": True})
+        bus = ServoBus(c, FakePCA9685(c.pca, c.channels))
+        self.assertAlmostEqual(bus.servo_angles([0, 0, 4, 0])[3], 131)
+
     def test_every_write_is_mirrored_during_motion(self):
         c = wide_cfg(pair={"servos": [{"channel": 1, "trim": 4}, {"channel": 2, "trim": -6}]})
         svc, drv = service(c)
@@ -86,7 +98,7 @@ class PairRule(unittest.TestCase):
         drv = FakePCA9685(c.pca, c.channels)
         bus = ServoBus(c, drv)
         original = core.servo_signs
-        core.servo_signs = lambda name: (+1, +1) if name == "pair" else (+1,)
+        core.servo_signs = lambda joint: (+1, +1) if joint.name == "pair" else (+1,)
         try:
             with self.assertRaises(AssertionError):
                 bus.apply([0, 5, 0, 0])

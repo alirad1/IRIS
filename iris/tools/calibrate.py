@@ -40,7 +40,7 @@ HELP = """\
   keys   1 2 3 4   pick joint (j0, pair, j3, j4)
          d or ->   move picked joint +step      a or <-   move it -step
          w or up   bigger step                  s or down smaller step
-         [         mark LOW end here            ]         mark HIGH end here
+         [         mark one end here            ]         mark the other end here
          z         set HOME (zero) here         h         walk all joints to home
          S         save to config               q         quit (servos go limp)
          ANY KEY while moving = stop right there"""
@@ -55,12 +55,54 @@ class Calibrator:
         self.sel = 0
         self.step_i = STEP_SIZES.index(5.0)
         self.should_stop = None  # set by the terminal UI: True if a key was pressed
+        self.session_path = os.path.join(os.path.dirname(os.path.abspath(save_path)),
+                                         "calibration_session.json")
         self.home: List[float] = [j.home for j in cfg.joints]
         self.low: List[Optional[float]] = [None] * 4
         self.high: List[Optional[float]] = [None] * 4
         self.dirty = False
         self.msg = "All joints are at home. Pick a joint (1-4) and jog it with a / d."
+        self._load_session()
         self.st = request(sock, addr, protocol.encode_status())
+
+    # Marked ends are kept in a session file so a crash or restart loses nothing.
+    def _load_session(self) -> None:
+        try:
+            with open(self.session_path, "r", encoding="utf-8") as f:
+                s = json.load(f)
+        except (OSError, ValueError):
+            return
+        loaded = []
+        for i, j in enumerate(self.cfg.joints):
+            e = s.get(j.name, {})
+            flip = -1.0 if bool(e.get("invert", False)) != j.invert else 1.0
+            for key, arr in (("end1", self.low), ("end2", self.high), ("home", self.home)):
+                v = e.get(key)
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    if key == "home" and abs(flip * float(v) - j.home) > 1e-6:
+                        self.dirty = True  # a home set last time but not saved
+                    arr[i] = flip * float(v)
+                    if key != "home":
+                        loaded.append(j.name)
+        if loaded:
+            self.msg = (f"Loaded marked ends from last session for {', '.join(sorted(set(loaded)))}. "
+                        "Pick a joint (1-4) and jog it with a / d.")
+
+    def _save_session(self) -> None:
+        s = {j.name: {"invert": j.invert, "end1": self.low[i], "end2": self.high[i],
+                      "home": self.home[i]}
+             for i, j in enumerate(self.cfg.joints)}
+        tmp = self.session_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(s, f, indent=2)
+        os.replace(tmp, self.session_path)
+
+    def ends(self, i: int):
+        """(low, high) of joint i if both ends are marked (either order), else None."""
+        a, b = self.low[i], self.high[i]
+        if a is None or b is None:
+            return None
+        return min(a, b), max(a, b)
 
     @property
     def step(self) -> float:
@@ -110,16 +152,17 @@ class Calibrator:
             elif k in ("s", "DOWN"):
                 self.step_i = max(self.step_i - 1, 0)
                 self.msg = f"step {self.step} deg"
-            elif k == "[":
-                self.low[self.sel] = pos
+            elif k in ("[", "]"):
+                (self.low if k == "[" else self.high)[self.sel] = pos
+                self._save_session()
                 self.dirty = True
-                self.msg = f"{name} LOW end marked at {pos:+.1f} (saved min will be {pos + MARGIN_DEG:+.1f})"
-            elif k == "]":
-                self.high[self.sel] = pos
-                self.dirty = True
-                self.msg = f"{name} HIGH end marked at {pos:+.1f} (saved max will be {pos - MARGIN_DEG:+.1f})"
+                e = self.ends(self.sel)
+                more = (f"saved range will be {e[0] + MARGIN_DEG:+.1f} .. {e[1] - MARGIN_DEG:+.1f}"
+                        if e else "now mark the other end")
+                self.msg = f"{name} end marked at {pos:+.1f} ({more})"
             elif k == "z":
                 self.home[self.sel] = pos
+                self._save_session()
                 self.dirty = True
                 self.msg = f"{name} HOME set to {pos:+.1f}"
             elif k == "h":
@@ -144,16 +187,14 @@ class Calibrator:
         new = copy.deepcopy(self.raw)
         for i, name in enumerate(JOINT_NAMES):
             j = new["joints"][name]
-            if self.low[i] is not None and self.high[i] is not None:
-                j["min"] = round(self.low[i] + MARGIN_DEG, 1)
-                j["max"] = round(self.high[i] - MARGIN_DEG, 1)
+            e = self.ends(i)
+            if e is not None:
+                j["min"] = round(e[0] + MARGIN_DEG, 1)
+                j["max"] = round(e[1] - MARGIN_DEG, 1)
             j["home"] = round(self.home[i], 1)
         return new
 
     def save(self) -> str:
-        for i, name in enumerate(JOINT_NAMES):
-            if (self.low[i] is None) != (self.high[i] is None):
-                return f"not saved: {name} has only one end marked. Mark both [ and ], or neither."
         new = self.proposed()
         try:
             config_mod.from_dict(new)
@@ -168,12 +209,14 @@ class Calibrator:
         os.replace(tmp, self.save_path)
         self.raw = new
         self.dirty = False
-        return f"saved to {self.save_path} (old version in .bak)"
+        todo = [n for i, n in enumerate(JOINT_NAMES) if self.ends(i) is None]
+        left = f" Still to mark (kept old limits): {', '.join(todo)}." if todo else ""
+        return f"saved to {self.save_path} (old version in .bak).{left}"
 
     def screen(self) -> str:
         new = self.proposed()
         rows = ["IRIS calibration   (calibration mode: max 3 deg per step, 5 deg/s)", "",
-                "     joint   angle    home   low end  high end   ->  saved min .. max   servo"]
+                "     joint   angle    home   end [    end ]      ->  saved min .. max   servo"]
         for i, name in enumerate(JOINT_NAMES):
             j = new["joints"][name]
             f = lambda v: "   --  " if v is None else f"{v:+7.1f}"
@@ -200,15 +243,30 @@ def read_key(fd) -> str:
     return c.decode(errors="ignore")
 
 
-def service_running(addr) -> bool:
+def service_status(addr) -> Optional[dict]:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        request(s, addr, protocol.encode_status())
-        return True
+        return request(s, addr, protocol.encode_status())
     except Abort:
-        return False
+        return None
     finally:
         s.close()
+
+
+def service_running(addr) -> bool:
+    return service_status(addr) is not None
+
+
+def stop_running_service(addr) -> None:
+    """Stop a service we did not start ourselves (after reconnecting)."""
+    try:
+        subprocess.run(["pkill", "-INT", "-f", "iris.motor.service"], check=False)
+    except FileNotFoundError:  # not on the Pi (e.g. Windows test run)
+        print("could not stop the motor service automatically; stop it by hand")
+        return
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and service_running(addr):
+        time.sleep(0.3)
 
 
 def start_service(dry_run: bool, addr) -> subprocess.Popen:
@@ -251,10 +309,21 @@ def main(argv=None) -> int:
     raw = config_mod.load_raw()
     addr = ("127.0.0.1", cfg.motor.udp_port)
 
-    if service_running(addr):
-        print("A motor service is already running. Stop it first with:\n"
-              "  pkill -INT -f iris.motor.service")
-        return 1
+    existing = service_status(addr)
+    if existing is not None:
+        same = (existing.get("config") == config_mod.fingerprint()
+                and "calibrate" in existing.get("mode", "")
+                and ("dry-run" in existing.get("mode", "")) == args.dry_run)
+        if not same:
+            print("A motor service is already running, started with different settings\n"
+                  "(or not in calibration mode), so this tool will not take it over.\n"
+                  "Support the arm, then stop it (the arm goes limp):\n"
+                  "  pkill -INT -f iris.motor.service\n"
+                  "and run this again.")
+            return 1
+        print("Reconnecting to the motor service that is already running in calibration mode.")
+        print("Nothing snaps; the arm stays where it is.", flush=True)
+        return run_session(cfg, raw, addr, args, proc=None)
 
     print("=" * 70)
     print("IRIS calibration")
@@ -273,6 +342,11 @@ def main(argv=None) -> int:
 
     print("starting motor service (3 s countdown, then servos snap to home)...", flush=True)
     proc = start_service(args.dry_run, addr)
+    return run_session(cfg, raw, addr, args, proc)
+
+
+def run_session(cfg, raw, addr, args, proc) -> int:
+    """proc is the service we started, or None if we reconnected to one."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         cal = Calibrator(cfg, raw, sock, addr, args.save_to)
@@ -287,7 +361,10 @@ def main(argv=None) -> int:
         return 0
     finally:
         sock.close()
-        stop_service(proc)
+        if proc is not None:
+            stop_service(proc)
+        else:
+            stop_running_service(addr)
         print("Motor service stopped. Servos are limp.")
 
 

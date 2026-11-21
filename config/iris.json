@@ -27,11 +27,12 @@
   },
   "joints": {
     "j0": {
-      "min": -10, "max": 10, "home": 0,
+      "min": -56.5, "max": 84.7, "home": 40.0,
       "servos": [{"channel": 0, "trim": 0}]
     },
     "pair": {
-      "min": -10, "max": 10, "home": 0,
+      "invert": true,
+      "min": -29.6, "max": 59.9, "home": 12.8,
       "servos": [{"channel": 1, "trim": 0}, {"channel": 2, "trim": 0}]
     },
     "j3": {

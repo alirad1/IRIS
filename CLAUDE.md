@@ -23,6 +23,8 @@ Verified on hardware 2026-11-21 (Phase 1 channel check, jogged ±10 by hand).
 
 Axes of the two bottom joints, in a frame centred on the disk at the bottom of the arm: b1 points out from the disk, b2 points up, b3 = b1 x b2 (along the j4 motor). `j3` rotates about b1, `j4` rotates about b3. Positive directions are not recorded yet (Phase 2).
 
+`pair` has `"invert": true` in config (2026-11-21, at Ali's request: positive now points away from the stand), so in practice CH1 = 135 - pair and CH2 = 135 + pair. Invert flips the whole joint; the two servos stay mirrored either way.
+
 The pair rule is the most important rule in this project. CH1 and CH2 are one joint. No function, CLI, config, or network message may ever command CH1 or CH2 separately. If they get different commands, the arm breaks.
 
 ## Architecture

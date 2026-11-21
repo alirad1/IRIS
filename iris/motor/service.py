@@ -35,10 +35,11 @@ class MotorService:
     """Network-free core of the service, so tests can drive it with a fake clock."""
 
     def __init__(self, cfg: Config, driver, calibrate: bool = False,
-                 mode: str = "normal") -> None:
+                 mode: str = "normal", config_id: str = "") -> None:
         self.cfg = cfg
         self.driver = driver
         self.mode = mode
+        self.config_id = config_id
         self.controller = MotionController(cfg, calibrate=calibrate)
         self.bus = ServoBus(cfg, driver)
         self.started = False
@@ -67,6 +68,7 @@ class MotorService:
         reply.update(self.controller.state())
         reply["mode"] = self.mode
         reply["joints"] = list(JOINT_NAMES)
+        reply["config"] = self.config_id
         if seq is not None:
             reply["seq"] = seq
         return protocol.encode_reply(reply)
@@ -176,7 +178,10 @@ def main(argv: Optional[list] = None) -> int:
             return 1
         driver = RealPCA9685(cfg.pca, cfg.channels)
 
-    service = MotorService(cfg, driver, calibrate=args.calibrate, mode=mode)
+    config_id = config_mod.fingerprint(args.config)
+    if args.max_speed is not None:
+        config_id += f"/speed{args.max_speed}"
+    service = MotorService(cfg, driver, calibrate=args.calibrate, mode=mode, config_id=config_id)
     try:
         serve(service, sock, 1.0 / cfg.motor.loop_hz, lambda: stop["flag"],
               verbose=not args.quiet)

@@ -1,8 +1,9 @@
 """Load and validate config/iris.json. Shared by the Pi and the PC.
 
-The config can set limits, home, channels and trims. It can NOT set servo
-direction signs: the pair rule (CH1 = +pair, CH2 = -pair) lives in code,
-see iris.motor.core.servo_signs.
+The config can set limits, home, channels, trims and a per-joint `invert`.
+It can NOT set individual servo signs: the pair rule (CH1 and CH2 always
+mirrored) lives in code, see iris.motor.core.servo_signs. `invert` flips the
+whole joint, so for the pair it swaps which servo gets +pair, never the mirroring.
 """
 from __future__ import annotations
 
@@ -45,6 +46,7 @@ class JointCfg:
     max: float
     home: float
     servos: Tuple[ServoCfg, ...]
+    invert: bool = False  # flips which way is positive; the pair stays mirrored
 
 
 @dataclass(frozen=True)
@@ -134,6 +136,13 @@ def _positive(v: Any, where: str, hi: float) -> float:
 
 def _joint(name: str, d: Any) -> JointCfg:
     where = f"joints.{name}"
+    if isinstance(d, dict) and "invert" in d:
+        invert = d["invert"]
+        if not isinstance(invert, bool):
+            raise ConfigError(f"{where}.invert: expected true or false")
+        d = {k: v for k, v in d.items() if k != "invert"}
+    else:
+        invert = False
     d = _section(d, ("min", "max", "home", "servos"), where)
     lo = _num(d["min"], f"{where}.min", -SERVO_CENTER_DEG, SERVO_CENTER_DEG)
     hi = _num(d["max"], f"{where}.max", -SERVO_CENTER_DEG, SERVO_CENTER_DEG)
@@ -155,7 +164,7 @@ def _joint(name: str, d: Any) -> JointCfg:
             channel=_int(s["channel"], f"{sw}.channel", 0, 15),
             trim=_num(s["trim"], f"{sw}.trim", -MAX_TRIM_DEG, MAX_TRIM_DEG),
         ))
-    return JointCfg(name, lo, hi, home, tuple(parsed))
+    return JointCfg(name, lo, hi, home, tuple(parsed), invert)
 
 
 def from_dict(d: Any) -> Config:
@@ -229,6 +238,21 @@ def from_dict(d: Any) -> Config:
 def load(path: Path | str = DEFAULT_CONFIG_PATH) -> Config:
     with open(path, "r", encoding="utf-8") as f:
         return from_dict(json.load(f))
+
+
+def fingerprint(path: Path | str = DEFAULT_CONFIG_PATH) -> str:
+    """Short hash of everything that decides how logical angles become servo
+    angles and how fast they move (channels, trims, invert, speeds), but not
+    min/max/home. Two programs with the same fingerprint agree on what "pair +10"
+    physically means."""
+    import hashlib
+    d = load_raw(path)
+    for j in d.get("joints", {}).values():
+        for k in ("min", "max", "home"):
+            j.pop(k, None)
+        j.setdefault("invert", False)
+    canon = json.dumps(d, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:16]
 
 
 def load_raw(path: Path | str = DEFAULT_CONFIG_PATH) -> Dict[str, Any]:

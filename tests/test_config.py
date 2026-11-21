@@ -72,6 +72,11 @@ class ConfigTests(unittest.TestCase):
         d["motor"]["oops"] = 1
         bad(d)
 
+    def test_invert_must_be_bool(self):
+        bad(raw(pair={"invert": 1}))
+        bad(raw(pair={"invert": "yes"}))
+        self.assertTrue(config_mod.from_dict(raw(pair={"invert": True})).joint("pair").invert)
+
     def test_non_numbers(self):
         bad(raw(j0={"min": "a"}))
         bad(raw(j0={"max": True}))

@@ -52,9 +52,12 @@ def request(sock, addr, data: bytes) -> dict:
 
 def servo_text(cfg, name: str, x: float) -> str:
     j = cfg.joint(name)
-    parts = [f"CH{s.channel}={SERVO_CENTER_DEG + s.trim + sign * x:.1f}"
-             for s, sign in zip(j.servos, servo_signs(name))]
-    return ", ".join(parts)
+    angles = [SERVO_CENTER_DEG + s.trim + sign * x for s, sign in zip(j.servos, servo_signs(j))]
+    if len(j.servos) == 2:
+        c1, c2 = j.servos
+        return (f"CH{c1.channel}={angles[0]:.1f} CH{c2.channel}={angles[1]:.1f} "
+                f"(mirrored +/-{abs(x):.1f})")
+    return f"CH{j.servos[0].channel}={angles[0]:.1f}"
 
 
 class Stopped(Abort):
