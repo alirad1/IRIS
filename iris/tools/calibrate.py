@@ -172,6 +172,8 @@ class Calibrator:
                 self.msg = self.save()
             elif k == "q":
                 return False
+            elif k == "\x13":
+                self.msg = "Ctrl+S does nothing here. Save is capital S (Shift+S)."
             else:
                 self.msg = "unknown key"
         except Stopped:
@@ -210,7 +212,8 @@ class Calibrator:
         self.raw = new
         self.dirty = False
         todo = [n for i, n in enumerate(JOINT_NAMES) if self.ends(i) is None]
-        left = f" Still to mark (kept old limits): {', '.join(todo)}." if todo else ""
+        left = (f" Still to mark (kept old limits): {', '.join(todo)}. "
+                "Mark ends with [ and ] before saving." if todo else "")
         return f"saved to {self.save_path} (old version in .bak).{left}"
 
     def screen(self) -> str:
@@ -379,6 +382,11 @@ def run_terminal(cal: Calibrator) -> None:
     cal.should_stop = lambda: bool(select.select([fd], [], [], 0)[0])
     try:
         tty.setcbreak(fd)
+        # Turn off Ctrl+S / Ctrl+Q flow control: Ctrl+S would pause the screen,
+        # the tool would block drawing it, and every key would seem dead.
+        attrs = termios.tcgetattr(fd)
+        attrs[0] &= ~(termios.IXON | termios.IXOFF)
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
         while True:
             sys.stdout.write("\x1b[2J\x1b[H" + cal.screen() + "\n")
             sys.stdout.flush()
