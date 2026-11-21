@@ -143,8 +143,10 @@ class MotionController:
     def set_target(self, targets: object, t: float) -> List[float]:
         values = self.clamp(validate_targets(targets))
         if self.max_step is not None:
-            for name, x, p in zip(JOINT_NAMES, values, self.pos):
-                if abs(x - p) > self.max_step + 1e-9:
+            # Re-sending the already accepted target is a keep-alive, not a new step,
+            # even if braking carried the joint a little past it.
+            for name, x, p, cur in zip(JOINT_NAMES, values, self.pos, self.target):
+                if abs(x - p) > self.max_step + 1e-9 and abs(x - cur) > 1e-9:
                     raise CommandError(
                         f"calibration mode: {name} target {x:.2f} is more than "
                         f"{self.max_step} deg from position {p:.2f}")

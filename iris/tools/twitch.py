@@ -21,7 +21,7 @@ from iris.config import JOINT_NAMES
 
 MAX_DELTA = 3.0
 RATE_HZ = 20.0
-REACH_TOL = 0.05
+REACH_TOL = 0.002  # the service lands exactly on the target, so "reached" means stopped
 MOVE_TIMEOUT_S = 10.0
 REPLY_TIMEOUT_S = 0.5
 

@@ -96,7 +96,13 @@ def serve(service: MotorService, sock: socket.socket, period: float,
                 sock.sendto(service.handle(data, now()), addr)
         t = now()
         if t >= next_tick:
+            was_holding = service.controller.holding
             service.tick(t)
+            if verbose and service.controller.holding and not was_holding:
+                c = service.controller
+                print(f"no command for {c.timeout_s} s: braking to hold at "
+                      f"{[round(x, 3) for x in c.target]} (pos {[round(x, 3) for x in c.pos]}, "
+                      f"vel {[round(v, 2) for v in c.vel]})", flush=True)
             next_tick += period
             if next_tick < t:
                 next_tick = t + period

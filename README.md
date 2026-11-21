@@ -86,6 +86,15 @@ Motor service, real servos (Pi). **Place the arm near home first; it snaps to ho
 cd ~/IRIS && ~/iris-servo-venv/bin/python -m iris.motor.service --max-speed 5
 ```
 
+Manual jog (Pi shell or PC, while the motor service runs). You type each move and it happens when you press Enter. Angles are absolute logical degrees (0 = home), within the service limits:
+```bash
+cd ~/IRIS && ~/iris-servo-venv/bin/python -m iris.tools.jog
+jog> pair 10      # CH1 -> 145, CH2 -> 125
+jog> home
+jog> quit
+```
+In `--calibrate` mode, jog refuses any single move bigger than 3°.
+
 Channel check (PC, while the motor service runs). This moves one logical joint +3° and back:
 ```powershell
 .venv\Scripts\python -m iris.tools.twitch pair

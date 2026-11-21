@@ -23,7 +23,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "scp failed" }
 
     $remote = "mkdir -p ~/IRIS && cd ~/IRIS && rm -rf iris config tests && " +
-              "tar -xzf ~/iris-deploy.tgz -C ~/IRIS && rm ~/iris-deploy.tgz && echo deployed to ~/IRIS"
+              "tar -xzmf ~/iris-deploy.tgz -C ~/IRIS && rm ~/iris-deploy.tgz && echo deployed to ~/IRIS"
     ssh $PiHost $remote
     if ($LASTEXITCODE -ne 0) { throw "remote extract failed" }
 }

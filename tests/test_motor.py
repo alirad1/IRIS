@@ -171,6 +171,24 @@ class Clamping(unittest.TestCase):
                 target(svc, clk.t, [0, 0, goal, 0])
         self.assertAlmostEqual(svc.controller.pos[J3], 15.0)
 
+    def test_calibrate_keepalive_accepted_after_braking_past(self):
+        svc, _ = service(cfg(), calibrate=True)
+        clk = Clock(svc)
+        for _ in range(4):  # get j3 moving up toward +3
+            target(svc, clk.t, [0, 0, 3.0, 0])
+            clk.run(0.1)
+        # Reverse while moving: momentum carries it a bit further up first.
+        c = svc.controller
+        new = c.pos[J3] - 2.9
+        self.assertTrue(target(svc, clk.t, [0, 0, new, 0])["ok"])
+        for _ in range(100):
+            clk.run(0.02)
+            r = target(svc, clk.t, [0, 0, new, 0])
+            self.assertTrue(r["ok"], r.get("error"))
+        self.assertAlmostEqual(c.pos[J3], new)
+        # A genuinely new target still has to be within 3 deg of the position.
+        self.assertFalse(target(svc, clk.t, [0, 0, new + 3.5, 0])["ok"])
+
     def test_calibrate_mode_speed_capped(self):
         svc, _ = service(wide_cfg(speed=30), calibrate=True)
         self.assertLessEqual(svc.controller.max_speed, 5.0)
