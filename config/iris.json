@@ -1,0 +1,46 @@
+{
+  "pca9685": {
+    "i2c_address": 64,
+    "frequency_hz": 50,
+    "min_pulse_us": 500,
+    "max_pulse_us": 2500,
+    "actuation_range_deg": 270
+  },
+  "motor": {
+    "udp_bind": "0.0.0.0",
+    "udp_port": 5005,
+    "loop_hz": 50,
+    "timeout_s": 0.5,
+    "max_speed_dps": 10,
+    "max_accel_dps2": 40
+  },
+  "calibration": {
+    "max_speed_dps": 5,
+    "max_step_deg": 3
+  },
+  "camera": {
+    "tcp_port": 5006,
+    "width": 640,
+    "height": 480,
+    "framerate": 30,
+    "jpeg_quality": 80
+  },
+  "joints": {
+    "j0": {
+      "min": -10, "max": 10, "home": 0,
+      "servos": [{"channel": 0, "trim": 0}]
+    },
+    "pair": {
+      "min": -10, "max": 10, "home": 0,
+      "servos": [{"channel": 1, "trim": 0}, {"channel": 2, "trim": 0}]
+    },
+    "j3": {
+      "min": -10, "max": 10, "home": 0,
+      "servos": [{"channel": 3, "trim": 0}]
+    },
+    "j4": {
+      "min": -10, "max": 10, "home": 0,
+      "servos": [{"channel": 4, "trim": 0}]
+    }
+  }
+}

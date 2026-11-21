@@ -1,0 +1,9 @@
+# Claude Code / AI assistant local state
+.claude/
+**/.claude/
+
+.venv/
+__pycache__/
+*.pyc
+models/*.task
+*.jpg

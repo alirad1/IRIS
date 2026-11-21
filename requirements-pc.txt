@@ -1,0 +1,3 @@
+# PC only. mediapipe brings opencv-contrib-python; do not add opencv-python too.
+mediapipe>=0.10.14
+numpy
