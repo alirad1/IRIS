@@ -21,6 +21,8 @@ Verified on hardware 2026-11-21 (Phase 1 channel check, jogged ±10 by hand).
 | `j3` | CH3 | independent |
 | `j4` (bottom) | CH4 | independent |
 
+Calibrated limits (Phase 2, 2026-11-21, confirmed by Ali; in config/iris.json): j0 -56.5..84.7 home 40, pair (inverted) -29.6..59.9 home 12.8, j3 -135..135 (full servo range, at Ali's request) home 0, j4 -68.5..57.1 home 0. Directions are not named: Phase 3 aim calibration is empirical, so it doesn't need them. j3 and j4 matter little for aiming until a light/camera is mounted at the end of the arm.
+
 Axes of the two bottom joints, in a frame centred on the disk at the bottom of the arm: b1 points out from the disk, b2 points up, b3 = b1 x b2 (along the j4 motor). `j3` rotates about b1, `j4` rotates about b3. Positive directions are not recorded yet (Phase 2).
 
 `pair` has `"invert": true` in config (2026-11-21, at Ali's request: positive now points away from the stand), so in practice CH1 = 135 - pair and CH2 = 135 + pair. Invert flips the whole joint; the two servos stay mirrored either way.

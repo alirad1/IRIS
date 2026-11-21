@@ -28,14 +28,14 @@ iris.tools.twitch      --- UDP 5005 --->   iris.motor.service     (only thing th
 
 `config/iris.json` is shared by the PC and the Pi. Each joint has `min`, `max`, `home` (logical degrees, 0 = servo centre 135) and `servos: [{channel, trim}]`. Until calibration, every joint is limited to −10..+10. The values are validated on load, and hard caps in `iris/config.py` stop the speed, timeout and calibration step from being loosened.
 
-| Logical joint | Channel(s) | Axis |
-|---|---|---|
-| `j0` (top) | CH0 | |
-| `pair` | CH1 (+), CH2 (−) | |
-| `j3` | CH3 | b1 (out from the bottom disk) |
-| `j4` (bottom) | CH4 | b3 = b1 × b2 (along the j4 motor; b2 is up) |
+| Logical joint | Channel(s) | Axis | Limits | Home |
+|---|---|---|---|---|
+| `j0` (top) | CH0 | | −56.5 … +84.7 | +40 |
+| `pair` | CH1, CH2 mirrored (`invert`: + points away from the stand) | | −29.6 … +59.9 | +12.8 |
+| `j3` | CH3 | b1 (out from the bottom disk) | −135 … +135 (full servo range) | 0 |
+| `j4` (bottom) | CH4 | b3 = b1 × b2 (along the j4 motor; b2 is up) | −68.5 … +57.1 | 0 |
 
-Channel mapping verified on hardware 2026-11-21. Positive directions and real limits come in Phase 2.
+The channel mapping was verified on hardware 2026-11-21. The limits were calibrated the same day, kept 3° inside the marked ends.
 
 ## PC setup (Windows, once)
 

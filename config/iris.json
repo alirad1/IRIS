@@ -36,11 +36,11 @@
       "servos": [{"channel": 1, "trim": 0}, {"channel": 2, "trim": 0}]
     },
     "j3": {
-      "min": -10, "max": 10, "home": 0,
+      "min": -135, "max": 135, "home": 0,
       "servos": [{"channel": 3, "trim": 0}]
     },
     "j4": {
-      "min": -10, "max": 10, "home": 0,
+      "min": -68.5, "max": 57.1, "home": 0,
       "servos": [{"channel": 4, "trim": 0}]
     }
   }

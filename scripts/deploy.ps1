@@ -27,7 +27,9 @@ if (-not $Force -and -not $KeepPiConfig) {
 
 $items = @("iris", "tests", "README.md")
 $wipe = "iris tests"
-if (-not $KeepPiConfig) { $items += "config"; $wipe += " config" }
+# config/ is never wiped: only iris.json is overwritten, so the calibration
+# session file and backups next to it survive.
+if (-not $KeepPiConfig) { $items += "config/iris.json" }
 if ($WithModel) { $items += "models" }
 
 Push-Location $root
