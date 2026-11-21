@@ -28,12 +28,14 @@ iris.tools.twitch      --- UDP 5005 --->   iris.motor.service     (only thing th
 
 `config/iris.json` is shared by the PC and the Pi. Each joint has `min`, `max`, `home` (logical degrees, 0 = servo centre 135) and `servos: [{channel, trim}]`. Until calibration, every joint is limited to −10..+10. The values are validated on load, and hard caps in `iris/config.py` stop the speed, timeout and calibration step from being loosened.
 
-| Logical joint | Channel(s) | Status |
+| Logical joint | Channel(s) | Axis |
 |---|---|---|
-| `j0` (top) | CH0 | not verified |
-| `pair` | CH1 (+), CH2 (−) | pair rule verified on hardware |
-| `j3` | CH3 | not verified |
-| `j4` (base) | CH4 | not verified |
+| `j0` (top) | CH0 | |
+| `pair` | CH1 (+), CH2 (−) | |
+| `j3` | CH3 | b1 (out from the bottom disk) |
+| `j4` (bottom) | CH4 | b3 = b1 × b2 (along the j4 motor; b2 is up) |
+
+Channel mapping verified on hardware 2026-11-21. Positive directions and real limits come in Phase 2.
 
 ## PC setup (Windows, once)
 

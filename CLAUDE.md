@@ -12,7 +12,7 @@ Fresh project. No old code is used. The goal is a robot arm that aims a (future)
 
 ## Channels (top of arm, farthest from ground, down to the base)
 
-I THINK this is the mapping, but it's not verified yet. Phase 1 includes a step to confirm it.
+Verified on hardware 2026-11-21 (Phase 1 channel check, jogged ±10 by hand).
 
 | Logical joint | PCA9685 channel(s) | Rule |
 |---|---|---|
@@ -20,6 +20,8 @@ I THINK this is the mapping, but it's not verified yet. Phase 1 includes a step 
 | `pair` | CH1 and CH2 | CH1 = +pair, CH2 = -pair (servos face opposite ways, already verified on hardware) |
 | `j3` | CH3 | independent |
 | `j4` (bottom) | CH4 | independent |
+
+Axes of the two bottom joints, in a frame centred on the disk at the bottom of the arm: b1 points out from the disk, b2 points up, b3 = b1 x b2 (along the j4 motor). `j3` rotates about b1, `j4` rotates about b3. Positive directions are not recorded yet (Phase 2).
 
 The pair rule is the most important rule in this project. CH1 and CH2 are one joint. No function, CLI, config, or network message may ever command CH1 or CH2 separately. If they get different commands, the arm breaks.
 
