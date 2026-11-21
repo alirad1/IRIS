@@ -59,6 +59,8 @@ class MotorService:
             cmd, targets, seq = protocol.parse_command(data)
             if cmd == "target":
                 self.controller.set_target(targets, t)
+            elif cmd == "hold":
+                self.controller.hold()
             reply = {"ok": True}
         except CommandError as e:
             reply = {"ok": False, "error": str(e)}

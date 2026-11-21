@@ -268,6 +268,21 @@ class Timeout(unittest.TestCase):
         clk.run(0.06)
         self.assertTrue(svc.controller.holding)
 
+    def test_hold_command_brakes_now_without_reversing(self):
+        svc, _ = service(wide_cfg())
+        clk = Clock(svc)
+        for _ in range(100):
+            target(svc, clk.t, [0, 80, 0, 0])
+            clk.run(0.02)
+        x0, v0 = svc.controller.pos[PAIR], svc.controller.vel[PAIR]
+        r = json.loads(svc.handle(protocol.encode_hold(), clk.t))
+        self.assertTrue(r["ok"])
+        self.assertTrue(svc.controller.holding)
+        xs = [p[PAIR] for p in clk.run(2.0)]
+        self.assertTrue(all(b >= a - 1e-12 for a, b in zip(xs, xs[1:])), "reversed")
+        self.assertLessEqual(xs[-1] - x0, v0 ** 2 / (2 * 40) + 0.3)  # no 0.5 s run-on
+        self.assertEqual(svc.controller.vel[PAIR], 0.0)
+
     def test_status_does_not_keep_it_alive(self):
         svc, _ = service(wide_cfg())
         clk = Clock(svc)

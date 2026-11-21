@@ -25,11 +25,15 @@ from typing import List, Optional
 from iris import config as config_mod
 from iris import protocol
 from iris.config import JOINT_NAMES, REPO_ROOT, ConfigError
-from iris.tools.jog import Abort, move, request, servo_text
+from iris.tools.jog import Abort, Stopped, request, servo_text
 
 MARGIN_DEG = 3.0
-MAX_STEP = 3.0
-STEP_SIZES = (0.5, 1.0, 2.0, 3.0)
+# The service rejects targets more than 3 deg from the position in calibration
+# mode, so bigger steps are driven as a target that slides at most this far ahead.
+LEAD_DEG = 2.9
+STEP_SIZES = (0.5, 1.0, 2.0, 3.0, 5.0, 10.0)
+RATE_HZ = 20.0
+MOVE_TIMEOUT_S = 120.0
 SERVICE_LOG = "/tmp/iris_motor_calibrate.log"
 
 HELP = """\
@@ -38,7 +42,8 @@ HELP = """\
          w or up   bigger step                  s or down smaller step
          [         mark LOW end here            ]         mark HIGH end here
          z         set HOME (zero) here         h         walk all joints to home
-         S         save to config               q         quit (servos go limp)"""
+         S         save to config               q         quit (servos go limp)
+         ANY KEY while moving = stop right there"""
 
 
 class Calibrator:
@@ -48,7 +53,8 @@ class Calibrator:
         self.cfg, self.raw, self.sock, self.addr = cfg, raw, sock, addr
         self.save_path = save_path
         self.sel = 0
-        self.step_i = 2  # 2 deg
+        self.step_i = STEP_SIZES.index(5.0)
+        self.should_stop = None  # set by the terminal UI: True if a key was pressed
         self.home: List[float] = [j.home for j in cfg.joints]
         self.low: List[Optional[float]] = [None] * 4
         self.high: List[Optional[float]] = [None] * 4
@@ -61,14 +67,25 @@ class Calibrator:
         return STEP_SIZES[self.step_i]
 
     def _go(self, goal: List[float]) -> None:
-        """Walk to goal with every joint moving at most MAX_STEP per command."""
+        """Move smoothly to goal. The target sent never leads the position by
+        more than LEAD_DEG, so the service's 3-deg calibration rule holds."""
         lims = self.st["limits"]
         for i, (g, (lo, hi)) in enumerate(zip(goal, lims)):
             if not lo <= g <= hi:
                 raise Abort(f"{JOINT_NAMES[i]} {g:+.1f} is past the servo range [{lo}, {hi}]")
+        t0 = time.monotonic()
         while any(abs(p - g) > 1e-3 for p, g in zip(self.st["pos"], goal)):
-            nxt = [p + max(-MAX_STEP, min(MAX_STEP, g - p)) for p, g in zip(self.st["pos"], goal)]
-            self.st = move(self.sock, self.addr, self.cfg, nxt, self.st, verbose=False)
+            if self.should_stop is not None and self.should_stop():
+                self.st = request(self.sock, self.addr, protocol.encode_hold())
+                raise Stopped("stopped by key press")
+            carrot = [p + max(-LEAD_DEG, min(LEAD_DEG, g - p))
+                      for p, g in zip(self.st["pos"], goal)]
+            self.st = request(self.sock, self.addr, protocol.encode_target(carrot))
+            if not self.st.get("ok"):
+                raise Abort(f"service rejected the move: {self.st.get('error')}")
+            if time.monotonic() - t0 > MOVE_TIMEOUT_S:
+                raise Abort("move took too long")
+            time.sleep(1.0 / RATE_HZ)
 
     def refresh(self) -> None:
         self.st = request(self.sock, self.addr, protocol.encode_status())
@@ -114,6 +131,10 @@ class Calibrator:
                 return False
             else:
                 self.msg = "unknown key"
+        except Stopped:
+            time.sleep(0.3)  # let it finish braking before showing the angle
+            self.refresh()
+            self.msg = f"STOPPED at {self.st['pos'][self.sel]:+.1f}"
         except Abort as e:
             self.refresh()
             self.msg = f"NOT MOVED FURTHER: {e}"
@@ -274,8 +295,11 @@ def run_terminal(cal: Calibrator) -> None:
     import termios
     import tty
 
+    import select
+
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
+    cal.should_stop = lambda: bool(select.select([fd], [], [], 0)[0])
     try:
         tty.setcbreak(fd)
         while True:

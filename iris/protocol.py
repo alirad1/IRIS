@@ -3,7 +3,8 @@
 Motor commands (UDP, JSON, one object per datagram):
     {"cmd": "target", "targets": [j0, pair, j3, j4]}
     {"cmd": "status"}
-Both may carry an optional integer "seq" that is echoed back. Any other key,
+    {"cmd": "hold"}          brake now and hold (same as the timeout, without waiting)
+All may carry an optional integer "seq" that is echoed back. Any other key,
 command, length or value is rejected. There is no message that names a
 channel.
 
@@ -40,6 +41,13 @@ def encode_status(seq: Optional[int] = None) -> bytes:
     return json.dumps(msg).encode("utf-8")
 
 
+def encode_hold(seq: Optional[int] = None) -> bytes:
+    msg: Dict[str, Any] = {"cmd": "hold"}
+    if seq is not None:
+        msg["seq"] = seq
+    return json.dumps(msg).encode("utf-8")
+
+
 def parse_command(data: bytes) -> Tuple[str, Optional[List[float]], Optional[int]]:
     """Returns (cmd, targets or None, seq or None). Raises ProtocolError."""
     if len(data) > MAX_DATAGRAM:
@@ -54,7 +62,7 @@ def parse_command(data: bytes) -> Tuple[str, Optional[List[float]], Optional[int
     if seq is not None and (isinstance(seq, bool) or not isinstance(seq, int)):
         raise ProtocolError("seq must be an integer")
     cmd = msg.get("cmd")
-    if cmd == "status":
+    if cmd in ("status", "hold"):
         allowed = {"cmd", "seq"}
     elif cmd == "target":
         allowed = {"cmd", "targets", "seq"}
@@ -63,7 +71,7 @@ def parse_command(data: bytes) -> Tuple[str, Optional[List[float]], Optional[int
     extra = set(msg) - allowed
     if extra:
         raise ProtocolError(f"unknown keys {sorted(extra)}")
-    if cmd == "status":
+    if cmd in ("status", "hold"):
         return cmd, None, seq
     if "targets" not in msg:
         raise ProtocolError("target command needs 'targets'")

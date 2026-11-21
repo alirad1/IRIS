@@ -16,6 +16,9 @@ class CommandParsing(unittest.TestCase):
         cmd, t, seq = protocol.parse_command(protocol.encode_target([1, -2.5, 3, 4], seq=7))
         self.assertEqual((cmd, t, seq), ("target", [1.0, -2.5, 3.0, 4.0], 7))
         self.assertEqual(protocol.parse_command(protocol.encode_status()), ("status", None, None))
+        self.assertEqual(protocol.parse_command(protocol.encode_hold(3)), ("hold", None, 3))
+        with self.assertRaises(ProtocolError):
+            protocol.parse_command(b'{"cmd":"hold","targets":[0,0,0,0]}')
 
     def test_rejects(self):
         for data in (b'{"cmd":"status","targets":[0,0,0,0]}', b'{"cmd":"target","targets":[0,0,0,0],"seq":1.5}',

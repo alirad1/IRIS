@@ -57,11 +57,23 @@ def servo_text(cfg, name: str, x: float) -> str:
     return ", ".join(parts)
 
 
-def move(sock, addr, cfg, goal: list, st: dict, verbose: bool = True) -> dict:
-    """Stream the goal until every joint reaches it."""
+class Stopped(Abort):
+    """The user asked to stop mid-move. The service has been told to brake and hold."""
+
+
+def move(sock, addr, cfg, goal: list, st: dict, verbose: bool = True,
+         should_stop=None) -> dict:
+    """Stream the goal until every joint reaches it.
+
+    should_stop: optional callable checked every cycle; if it returns True the
+    service is told to brake and hold right away, and Stopped is raised.
+    """
     t0 = time.monotonic()
     last_print = 0.0
     while True:
+        if should_stop is not None and should_stop():
+            request(sock, addr, protocol.encode_hold())
+            raise Stopped("stopped by key press; braking and holding")
         st = request(sock, addr, protocol.encode_target(goal))
         if not st.get("ok"):
             raise Abort(f"service rejected the move: {st.get('error')}")
