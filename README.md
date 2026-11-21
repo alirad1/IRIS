@@ -88,6 +88,25 @@ Motor service, real servos (Pi). **Place the arm near home first; it snaps to ho
 cd ~/IRIS && ~/iris-servo-venv/bin/python -m iris.motor.service --max-speed 5
 ```
 
+Calibrate limits and home (Pi shell, one command; it starts and stops the motor service itself):
+```bash
+cd ~/IRIS && ~/iris-servo-venv/bin/python -m iris.tools.calibrate
+```
+Type `go`, and all servos snap to home. Then use the keys:
+- `1`–`4` pick a joint.
+- `a`/`d` (or ←/→) jog it, at most 3° per press at 5 deg/s.
+- `w`/`s` change the step size.
+- `[` and `]` mark the low and high ends.
+- `z` sets home.
+- `h` walks every joint back to home.
+- `S` saves. Limits are saved 3° inside the marked ends.
+- `q` quits, and the servos go limp.
+
+After calibrating, pull the config into the repo before the next deploy. Deploy refuses to run while the two copies differ.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\pull_config.ps1
+```
+
 Manual jog (Pi shell or PC, while the motor service runs). You type each move and it happens when you press Enter. Angles are absolute logical degrees (0 = home), within the service limits:
 ```bash
 cd ~/IRIS && ~/iris-servo-venv/bin/python -m iris.tools.jog

@@ -57,7 +57,7 @@ def servo_text(cfg, name: str, x: float) -> str:
     return ", ".join(parts)
 
 
-def move(sock, addr, cfg, goal: list, st: dict) -> dict:
+def move(sock, addr, cfg, goal: list, st: dict, verbose: bool = True) -> dict:
     """Stream the goal until every joint reaches it."""
     t0 = time.monotonic()
     last_print = 0.0
@@ -66,12 +66,13 @@ def move(sock, addr, cfg, goal: list, st: dict) -> dict:
         if not st.get("ok"):
             raise Abort(f"service rejected the move: {st.get('error')}")
         now = time.monotonic()
-        if now - last_print >= 0.5:
+        if verbose and now - last_print >= 0.5:
             print("   pos " + "  ".join(f"{n}={x:+6.2f}" for n, x in zip(JOINT_NAMES, st["pos"])),
                   flush=True)
             last_print = now
         if all(abs(p - g) <= REACH_TOL for p, g in zip(st["pos"], goal)):
-            print(f"   reached in {now - t0:.1f} s. Holding.")
+            if verbose:
+                print(f"   reached in {now - t0:.1f} s. Holding.")
             return st
         if now - t0 > MOVE_TIMEOUT_S:
             raise Abort("move took too long")

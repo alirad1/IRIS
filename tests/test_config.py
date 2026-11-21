@@ -15,10 +15,11 @@ def bad(d):
 
 
 class ConfigTests(unittest.TestCase):
-    def test_repo_config_loads_with_uncalibrated_limits(self):
+    def test_repo_config_loads_with_verified_channels(self):
         c = config_mod.load()
         for j in c.joints:
-            self.assertEqual((j.min, j.max), (-10, 10), j.name)
+            self.assertLessEqual(j.min, j.home, j.name)
+            self.assertLessEqual(j.home, j.max, j.name)
         self.assertEqual(c.channels, (0, 1, 2, 3, 4))
         self.assertEqual(c.motor.timeout_s, 0.5)
 

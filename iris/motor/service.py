@@ -140,8 +140,9 @@ def main(argv: Optional[list] = None) -> int:
     def on_signal(signum, frame):
         stop["flag"] = True
     signal.signal(signal.SIGINT, on_signal)
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, on_signal)
+    for name in ("SIGTERM", "SIGHUP"):  # SIGHUP: the shell it ran in was closed
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), on_signal)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((cfg.motor.udp_bind, cfg.motor.udp_port))

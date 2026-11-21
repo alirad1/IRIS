@@ -2,13 +2,26 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1 -WithModel
 # Uses the `iris-pi` alias from ~/.ssh/config. Does not start anything on the Pi.
+# Refuses to run if the Pi's config/iris.json differs from this one (for example
+# after calibrating on the Pi): run scripts\pull_config.ps1 first, or pass -Force.
 param(
     [string]$PiHost = "iris-pi",
-    [switch]$WithModel
+    [switch]$WithModel,
+    [switch]$Force
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $tgz = Join-Path $env:TEMP "iris-deploy.tgz"
+
+if (-not $Force) {
+    $local = (Get-FileHash (Join-Path $root "config\iris.json") -Algorithm SHA256).Hash.ToLower()
+    $remote = (ssh -n $PiHost "sha256sum ~/IRIS/config/iris.json 2>/dev/null | cut -d' ' -f1")
+    if ($LASTEXITCODE -ne 0) { throw "could not reach $PiHost" }
+    if ($remote -and ($remote.Trim() -ne $local)) {
+        throw ("The Pi's config/iris.json differs from this one (calibrated on the Pi?). " +
+               "Run scripts\pull_config.ps1 first, or -Force to overwrite the Pi's copy.")
+    }
+}
 
 $items = @("iris", "config", "tests", "README.md")
 if ($WithModel) { $items += "models" }
